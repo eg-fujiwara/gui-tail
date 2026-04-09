@@ -1,0 +1,97 @@
+.file-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #404040;
+}
+
+.btn {
+  padding: 4px 12px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: #0e639c;
+  color: #fff;
+  border-color: #0e639c;
+}
+
+.btn-primary:hover {
+  background: #1177bb;
+}
+
+.btn-secondary {
+  background: #3c3c3c;
+  color: #ccc;
+}
+
+.btn-secondary:hover {
+  background: #4a4a4a;
+}
+
+.history-wrapper {
+  position: relative;
+}
+
+.history-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: #2d2d2d;
+  border: 1px solid #555;
+  border-radius: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  min-width: 400px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.history-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #ccc;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #383838;
+}
+
+.history-item:hover {
+  background: #094771;
+  color: #fff;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-path {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item:hover .history-path {
+  color: #aaa;
+}
+
+.current-file {
+  color: #888;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}

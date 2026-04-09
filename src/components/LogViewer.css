@@ -1,0 +1,30 @@
+.log-viewer {
+  flex: 1;
+  overflow-y: auto;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 8px;
+  user-select: text;
+  cursor: text;
+}
+
+.log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 0 4px;
+  min-height: 1.4em;
+}
+
+.log-line:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.log-empty {
+  color: #666;
+  text-align: center;
+  padding-top: 40px;
+  font-size: 14px;
+}

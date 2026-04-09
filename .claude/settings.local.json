@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm view:*)",
+      "Bash(python3 -c \":*)",
+      "WebFetch(domain:rustsec.org)",
+      "WebFetch(domain:security.snyk.io)"
+    ]
+  }
+}
