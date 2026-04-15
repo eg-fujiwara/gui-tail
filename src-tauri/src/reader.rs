@@ -1,20 +1,34 @@
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 
 pub struct TailReader {
     path: PathBuf,
     offset: u64,
+    file: Option<File>,
 }
 
 impl TailReader {
     pub fn new(path: PathBuf) -> Self {
-        Self { path, offset: 0 }
+        Self {
+            path,
+            offset: 0,
+            file: None,
+        }
+    }
+
+    /// Open (or reopen) the file handle.
+    fn open_file(&mut self) -> io::Result<()> {
+        let file = File::open(&self.path)?;
+        self.file = Some(file);
+        Ok(())
     }
 
     /// Read the last `initial_lines` lines from the file and set offset to the end.
+    /// Uses a seek-from-end approach to avoid reading the entire file.
     pub fn init_at_end(&mut self, initial_lines: usize) -> io::Result<Vec<String>> {
-        let file = File::open(&self.path)?;
+        self.open_file()?;
+        let file = self.file.as_ref().unwrap();
         let file_len = file.metadata()?.len();
 
         if file_len == 0 {
@@ -22,35 +36,65 @@ impl TailReader {
             return Ok(Vec::new());
         }
 
-        // Read entire file to find last N lines (simple approach for initial load)
-        let mut reader = BufReader::new(file);
-        let mut all_lines = Vec::new();
-        let mut line = String::new();
+        // Read a chunk from the end of the file to find the last N lines.
+        // Start with 8KB and double if we don't find enough lines.
+        let mut chunk_size: u64 = 8 * 1024;
+        let mut lines: Vec<String>;
 
-        while reader.read_line(&mut line)? > 0 {
-            let trimmed = line.trim_end_matches(|c| c == '\n' || c == '\r').to_string();
-            all_lines.push(trimmed);
-            line.clear();
+        loop {
+            let start = if file_len > chunk_size {
+                file_len - chunk_size
+            } else {
+                0
+            };
+
+            let file = self.file.as_mut().unwrap();
+            file.seek(SeekFrom::Start(start))?;
+
+            let mut buf = Vec::with_capacity(chunk_size as usize);
+            file.read_to_end(&mut buf)?;
+
+            let text = String::from_utf8_lossy(&buf);
+            lines = text.lines().map(|l| l.to_string()).collect();
+
+            // If we started mid-file, the first "line" may be partial — drop it
+            if start > 0 && !lines.is_empty() {
+                lines.remove(0);
+            }
+
+            // If we have enough lines or already read the whole file, stop
+            if lines.len() >= initial_lines || start == 0 {
+                break;
+            }
+
+            // Double the chunk and retry
+            chunk_size = (chunk_size * 2).min(file_len);
         }
 
         self.offset = file_len;
 
-        let start = if all_lines.len() > initial_lines {
-            all_lines.len() - initial_lines
-        } else {
-            0
-        };
+        // Take only the last N lines
+        if lines.len() > initial_lines {
+            lines = lines.split_off(lines.len() - initial_lines);
+        }
 
-        Ok(all_lines.split_off(start))
+        Ok(lines)
     }
 
     /// Read only new lines appended since last read.
+    /// Reuses the open file handle to avoid triggering antivirus scans on every poll.
     pub fn read_new_lines(&mut self) -> io::Result<Vec<String>> {
-        let file = File::open(&self.path)?;
+        // Reopen if we don't have a handle (first call or after error)
+        if self.file.is_none() {
+            self.open_file()?;
+        }
+
+        let file = self.file.as_ref().unwrap();
         let file_len = file.metadata()?.len();
 
-        // File was truncated — reset to beginning
+        // File was truncated or replaced — reopen and reset
         if file_len < self.offset {
+            self.open_file()?;
             self.offset = 0;
         }
 
@@ -58,11 +102,11 @@ impl TailReader {
             return Ok(Vec::new());
         }
 
-        let mut reader = BufReader::new(file);
-        reader.seek(SeekFrom::Start(self.offset))?;
+        let file = self.file.as_mut().unwrap();
+        file.seek(SeekFrom::Start(self.offset))?;
 
         let mut new_data = Vec::new();
-        reader.read_to_end(&mut new_data)?;
+        file.read_to_end(&mut new_data)?;
 
         // Only process complete lines (ending with \n)
         // Keep incomplete data for next read

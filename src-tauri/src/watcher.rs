@@ -6,6 +6,9 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
+/// Maximum backoff multiplier: idle interval can grow up to 5x the base interval
+const MAX_BACKOFF_MULTIPLIER: u64 = 5;
+
 pub struct TailWatcher {
     stop_signal: Option<Arc<AtomicBool>>,
     poll_interval_ms: Arc<AtomicU64>,
@@ -52,24 +55,33 @@ impl TailWatcher {
         let interval = self.poll_interval_ms.clone();
 
         let handle = thread::spawn(move || {
+            let mut idle_count: u64 = 0;
+
             loop {
                 if stop_clone.load(Ordering::Relaxed) {
                     break;
                 }
 
-                let ms = interval.load(Ordering::Relaxed);
-                thread::sleep(Duration::from_millis(ms));
+                let base_ms = interval.load(Ordering::Relaxed);
+                // Exponential backoff when idle: base * min(idle_count, MAX_BACKOFF_MULTIPLIER)
+                let multiplier = idle_count.min(MAX_BACKOFF_MULTIPLIER).max(1);
+                let sleep_ms = base_ms * multiplier;
+                thread::sleep(Duration::from_millis(sleep_ms));
 
                 match reader.read_new_lines() {
                     Ok(lines) if !lines.is_empty() => {
                         app_handle.emit("tail-lines", &lines).ok();
+                        idle_count = 0; // Reset backoff on activity
                     }
                     Err(e) => {
                         app_handle
                             .emit("tail-error", format!("{}", e))
                             .ok();
+                        idle_count += 1;
                     }
-                    _ => {}
+                    _ => {
+                        idle_count += 1; // No new data — increase backoff
+                    }
                 }
             }
         });
